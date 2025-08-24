@@ -18,7 +18,8 @@ public class TeaLeafSolution {
     private List<Truck> trucks;
     
     @PlanningEntityCollectionProperty
-    private List<SupplierVisit> supplierVisits;
+    @ValueRangeProvider(id = "supplierAssignmentRange")
+    private List<SupplierAssignment> supplierAssignments;
     
     @ProblemFactProperty
     private Depot depot;
@@ -31,9 +32,9 @@ public class TeaLeafSolution {
     }
     
     // Constructor with all fields
-    public TeaLeafSolution(List<Truck> trucks, List<SupplierVisit> supplierVisits, Depot depot) {
+    public TeaLeafSolution(List<Truck> trucks, List<SupplierAssignment> supplierAssignments, Depot depot) {
         this.trucks = trucks;
-        this.supplierVisits = supplierVisits;
+        this.supplierAssignments = supplierAssignments;
         this.depot = depot;
     }
     
@@ -46,12 +47,12 @@ public class TeaLeafSolution {
         this.trucks = trucks;
     }
     
-    public List<SupplierVisit> getSupplierVisits() {
-        return supplierVisits;
+    public List<SupplierAssignment> getSupplierAssignments() {
+        return supplierAssignments;
     }
     
-    public void setSupplierVisits(List<SupplierVisit> supplierVisits) {
-        this.supplierVisits = supplierVisits;
+    public void setSupplierAssignments(List<SupplierAssignment> supplierAssignments) {
+        this.supplierAssignments = supplierAssignments;
     }
     
     public Depot getDepot() {

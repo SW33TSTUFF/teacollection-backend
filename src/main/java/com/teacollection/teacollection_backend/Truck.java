@@ -6,6 +6,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import lombok.Data;
 
+
 @Entity
 @Data
 public class Truck {
@@ -17,4 +18,6 @@ public class Truck {
     private double currentLoad;
 
     private String status; // IDLE, EN_ROUTE, RETURNING
+    
+
 }

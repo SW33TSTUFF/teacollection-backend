@@ -7,7 +7,6 @@ import org.optaplanner.core.config.solver.SolverConfig;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 public class OptimizationService {
@@ -18,7 +17,7 @@ public class OptimizationService {
         // Configure the solver
         SolverConfig solverConfig = new SolverConfig()
                 .withSolutionClass(TeaLeafSolution.class)
-                .withEntityClasses(SupplierVisit.class)
+                .withEntityClasses(SupplierAssignment.class)
                 .withConstraintProviderClass(TeaCollectionConstraintProvider.class)
                 .withTerminationSpentLimit(java.time.Duration.ofMinutes(5));
         
@@ -26,13 +25,13 @@ public class OptimizationService {
     }
     
     public TeaLeafSolution optimizeTeaCollection(List<Truck> trucks, List<Supplier> suppliers, Depot depot) {
-        // Create supplier visits from suppliers
-        List<SupplierVisit> supplierVisits = suppliers.stream()
-                .map(SupplierVisit::new)
-                .collect(Collectors.toList());
+        // Create supplier assignments from suppliers
+        List<SupplierAssignment> supplierAssignments = suppliers.stream()
+                .map(SupplierAssignment::new)
+                .collect(java.util.stream.Collectors.toList());
         
         // Create the problem
-        TeaLeafSolution problem = new TeaLeafSolution(trucks, supplierVisits, depot);
+        TeaLeafSolution problem = new TeaLeafSolution(trucks, supplierAssignments, depot);
         
         // Solve the problem
         Solver<TeaLeafSolution> solver = solverFactory.buildSolver();
@@ -42,13 +41,13 @@ public class OptimizationService {
     }
     
     public TeaLeafSolution solveAsync(List<Truck> trucks, List<Supplier> suppliers, Depot depot) {
-        // Create supplier visits from suppliers
-        List<SupplierVisit> supplierVisits = suppliers.stream()
-                .map(SupplierVisit::new)
-                .collect(Collectors.toList());
+        // Create supplier assignments from suppliers
+        List<SupplierAssignment> supplierAssignments = suppliers.stream()
+                .map(SupplierAssignment::new)
+                .collect(java.util.stream.Collectors.toList());
         
         // Create the problem
-        TeaLeafSolution problem = new TeaLeafSolution(trucks, supplierVisits, depot);
+        TeaLeafSolution problem = new TeaLeafSolution(trucks, supplierAssignments, depot);
         
         // Start solving asynchronously
         Solver<TeaLeafSolution> solver = solverFactory.buildSolver();

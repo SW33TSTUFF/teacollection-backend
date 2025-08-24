@@ -8,6 +8,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 
 import java.util.Arrays;
 import java.util.List;
+import com.teacollection.teacollection_backend.SupplierAssignment;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -48,21 +49,21 @@ public class OptaPlannerIntegrationTest {
         depot.setLatitude(0.0);
         depot.setLongitude(0.0);
 
-        // Create supplier visits
-        SupplierVisit visit1 = new SupplierVisit(supplier1);
-        SupplierVisit visit2 = new SupplierVisit(supplier2);
-
+        // Create supplier assignments
+        SupplierAssignment assignment1 = new SupplierAssignment(supplier1);
+        SupplierAssignment assignment2 = new SupplierAssignment(supplier2);
+        
         // Create the problem
         TeaLeafSolution problem = new TeaLeafSolution(
                 Arrays.asList(truck1, truck2),
-                Arrays.asList(visit1, visit2),
+                Arrays.asList(assignment1, assignment2),
                 depot
         );
 
         // Configure and create solver
         SolverConfig solverConfig = new SolverConfig()
                 .withSolutionClass(TeaLeafSolution.class)
-                .withEntityClasses(SupplierVisit.class)
+                .withEntityClasses(SupplierAssignment.class)
                 .withConstraintProviderClass(TeaCollectionConstraintProvider.class)
                 .withTerminationSpentLimit(java.time.Duration.ofSeconds(10));
 
@@ -78,15 +79,15 @@ public class OptaPlannerIntegrationTest {
         assertTrue(solution.getScore().getHardScore() >= 0); // Should not have hard constraint violations
         
         // Verify all suppliers are assigned
-        assertTrue(solution.getSupplierVisits().stream().allMatch(SupplierVisit::isAssigned));
+        assertTrue(solution.getSupplierAssignments().stream().allMatch(assignment -> assignment.isAssigned()));
         
         // Verify truck capacity constraints
-        solution.getSupplierVisits().forEach(visit -> {
-            if (visit.isAssigned()) {
-                Truck truck = visit.getAssignedTruck();
-                double totalLoad = solution.getSupplierVisits().stream()
-                        .filter(v -> v.isAssigned() && v.getAssignedTruck().equals(truck))
-                        .mapToDouble(SupplierVisit::getHarvestWeight)
+        solution.getSupplierAssignments().forEach(assignment -> {
+            if (assignment.isAssigned()) {
+                Truck truck = assignment.getAssignedTruck();
+                double totalLoad = solution.getSupplierAssignments().stream()
+                        .filter(a -> a.isAssigned() && a.getAssignedTruck().equals(truck))
+                        .mapToDouble(SupplierAssignment::getHarvestWeight)
                         .sum();
                 assertTrue(totalLoad <= truck.getMaxCapacity(), 
                     "Truck " + truck.getId() + " capacity exceeded: " + totalLoad + " > " + truck.getMaxCapacity());

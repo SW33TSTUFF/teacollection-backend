@@ -16,15 +16,17 @@ The implementation uses OptaPlanner to solve the Vehicle Routing Problem (VRP) f
 The main planning solution class that holds all problem data:
 - **@PlanningSolution**: Marks this class as the solution container
 - **@ProblemFactCollectionProperty**: Lists of trucks (fixed data)
-- **@PlanningEntityCollectionProperty**: List of supplier visits (assignable entities)
+- **@PlanningEntityCollectionProperty**: List of suppliers (assignable entities)
 - **@ProblemFactProperty**: Depot location (fixed data)
 - **@PlanningScore**: Solution score (HardSoftScore)
 
-### 2. SupplierVisit.java
-Planning entity that represents a supplier visit:
+### 2. Domain Classes Structure
+**Truck.java**: Pure JPA entity for truck data
+**Supplier.java**: Pure JPA entity for supplier data
+**SupplierAssignment.java**: 
 - **@PlanningEntity**: Marks this class as assignable by OptaPlanner
-- **@PlanningVariable**: The truck assigned to this visit
-- **visitOrder**: The sequence of visits for each truck
+- **@PlanningVariable**: The truck assigned to this supplier assignment
+- **@PlanningVariable**: The previous supplier assignment in the route sequence
 
 ### 3. TeaCollectionConstraintProvider.java
 Defines all business rules and scoring:
@@ -54,6 +56,16 @@ List<Supplier> suppliers = // ... get suppliers from repository
 Depot depot = // ... get depot from repository
 
 TeaLeafSolution solution = optimizationService.optimizeTeaCollection(trucks, suppliers, depot);
+
+// Access the optimized solution
+solution.getSupplierAssignments().forEach(assignment -> {
+    if (assignment.isAssigned()) {
+        System.out.println("Supplier " + assignment.getSupplierId() + " assigned to Truck " + assignment.getAssignedTruck().getId());
+        if (assignment.getPreviousAssignment() != null) {
+            System.out.println("  Previous supplier: " + assignment.getPreviousAssignment().getSupplierId());
+        }
+    }
+});
 ```
 
 ### Solver Configuration

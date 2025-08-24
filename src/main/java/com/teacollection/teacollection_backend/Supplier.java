@@ -7,6 +7,7 @@ import jakarta.persistence.GenerationType;
 import lombok.Data; // From the Lombok dependency
 import java.time.LocalDateTime;
 
+
 @Entity // Tells Spring this is a database entity
 @Data   // Lombok annotation to auto-generate getters, setters, etc.
 public class Supplier {
@@ -19,4 +20,6 @@ public class Supplier {
     private boolean isReady;
     private LocalDateTime availableFrom;
     private LocalDateTime availableUntil;
+    
+
 }
