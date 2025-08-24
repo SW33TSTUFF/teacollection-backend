@@ -17,7 +17,7 @@ import java.util.Optional;
  * Handles CRUD operations, availability updates, and supplier queries.
  */
 @RestController
-@RequestMapping("/api/suppliers")
+@RequestMapping({"/api/suppliers", "/api/suppliers/"})
 @RequiredArgsConstructor
 @Slf4j
 @CrossOrigin(origins = "*")

@@ -17,7 +17,7 @@ import java.util.Optional;
  * Handles CRUD operations, status updates, and capacity management.
  */
 @RestController
-@RequestMapping("/api/trucks")
+@RequestMapping({"/api/trucks", "/api/trucks/"})
 @RequiredArgsConstructor
 @Slf4j
 @CrossOrigin(origins = "*")

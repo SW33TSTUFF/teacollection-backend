@@ -2,6 +2,8 @@ package com.teacollection.teacollection_backend;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import lombok.Data; // From the Lombok dependency
 import java.time.LocalDateTime;
 
@@ -9,6 +11,7 @@ import java.time.LocalDateTime;
 @Data   // Lombok annotation to auto-generate getters, setters, etc.
 public class Supplier {
     @Id // Marks this field as the primary key
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private double latitude;
     private double longitude;
