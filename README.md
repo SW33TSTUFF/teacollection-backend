@@ -141,8 +141,9 @@ Core entities are already defined:
 - `Supplier(id, latitude, longitude, harvestWeight, isReady, availableFrom, availableUntil)`
 - `Truck(id, maxCapacity, currentLoad, status)`
 - `Depot(latitude, longitude)`
+- `Route(id, truck, supplierSequence, depot, totalDistance, totalWeight, status, timestamps)`
 
-**Next**: Create the `Route` entity and implement repositories.
+**Next**: Implement services and business logic.
 
 ### Step 3: Domain Modeling ✅
 
@@ -150,6 +151,16 @@ Basic entities are implemented:
 - `Supplier` → Planning entity for OptaPlanner
 - `Truck` → Vehicle with capacity constraints
 - `Depot` → Central location for trucks
+- `Route` → Route assignment with supplier sequence
+
+### Step 3.5: Repository Interfaces ✅
+
+JPA repositories implemented with comprehensive query methods:
+- `SupplierRepository` → Supplier management and availability queries
+- `TruckRepository` → Truck status and capacity queries
+- `DepotRepository` → Depot location and proximity queries
+- `RouteRepository` → Route optimization and status queries
+- `TeaCollectionRepository` → System-wide statistics and analytics
 
 **Next**: Model Planning Entities and Variables for OptaPlanner.
 
