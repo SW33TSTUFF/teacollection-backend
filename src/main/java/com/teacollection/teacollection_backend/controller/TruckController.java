@@ -1,20 +1,18 @@
 package com.teacollection.teacollection_backend.controller;
 
 import com.teacollection.teacollection_backend.Truck;
-import com.teacollection.teacollection_backend.repository.TruckRepository;
+import com.teacollection.teacollection_backend.service.TruckService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import org.springframework.validation.annotation.Validated;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * REST Controller for Truck management operations.
- * Handles CRUD operations, status updates, and capacity management.
+ * Handles CRUD operations, load updates, and truck queries.
  */
 @RestController
 @RequestMapping({"/api/trucks", "/api/trucks/"})
@@ -23,7 +21,7 @@ import java.util.Optional;
 @CrossOrigin(origins = "*")
 public class TruckController {
 
-    private final TruckRepository truckRepository;
+    private final TruckService truckService;
 
     /**
      * Get all trucks
@@ -32,7 +30,7 @@ public class TruckController {
     @GetMapping
     public ResponseEntity<List<Truck>> getAllTrucks() {
         try {
-            List<Truck> trucks = truckRepository.findAll();
+            List<Truck> trucks = truckService.getAllTrucks();
             log.info("Retrieved {} trucks", trucks.size());
             return ResponseEntity.ok(trucks);
         } catch (Exception e) {
@@ -49,14 +47,12 @@ public class TruckController {
     @GetMapping("/{id}")
     public ResponseEntity<Truck> getTruckById(@PathVariable Long id) {
         try {
-            Optional<Truck> truck = truckRepository.findById(id);
-            if (truck.isPresent()) {
-                log.info("Retrieved truck with ID: {}", id);
-                return ResponseEntity.ok(truck.get());
-            } else {
-                log.warn("Truck not found with ID: {}", id);
-                return ResponseEntity.notFound().build();
-            }
+            Truck truck = truckService.getTruckById(id);
+            log.info("Retrieved truck with ID: {}", id);
+            return ResponseEntity.ok(truck);
+        } catch (RuntimeException e) {
+            log.warn("Truck not found with ID: {}", id);
+            return ResponseEntity.notFound().build();
         } catch (Exception e) {
             log.error("Error retrieving truck with ID: {}", id, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
@@ -71,15 +67,7 @@ public class TruckController {
     @PostMapping
     public ResponseEntity<Truck> createTruck(@RequestBody Truck truck) {
         try {
-            // Set default values if not provided
-            if (truck.getStatus() == null) {
-                truck.setStatus("IDLE");
-            }
-            if (truck.getCurrentLoad() == 0.0) {
-                truck.setCurrentLoad(0.0);
-            }
-            
-            Truck savedTruck = truckRepository.save(truck);
+            Truck savedTruck = truckService.createTruck(truck);
             log.info("Created new truck with ID: {}", savedTruck.getId());
             return ResponseEntity.status(HttpStatus.CREATED).body(savedTruck);
         } catch (Exception e) {
@@ -97,15 +85,12 @@ public class TruckController {
     @PutMapping("/{id}")
     public ResponseEntity<Truck> updateTruck(@PathVariable Long id, @RequestBody Truck truck) {
         try {
-            if (!truckRepository.existsById(id)) {
-                log.warn("Truck not found for update with ID: {}", id);
-                return ResponseEntity.notFound().build();
-            }
-            
-            truck.setId(id);
-            Truck updatedTruck = truckRepository.save(truck);
+            Truck updatedTruck = truckService.updateTruck(id, truck);
             log.info("Updated truck with ID: {}", id);
             return ResponseEntity.ok(updatedTruck);
+        } catch (RuntimeException e) {
+            log.warn("Truck not found for update with ID: {}", id);
+            return ResponseEntity.notFound().build();
         } catch (Exception e) {
             log.error("Error updating truck with ID: {}", id, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
@@ -120,14 +105,12 @@ public class TruckController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteTruck(@PathVariable Long id) {
         try {
-            if (!truckRepository.existsById(id)) {
-                log.warn("Truck not found for deletion with ID: {}", id);
-                return ResponseEntity.notFound().build();
-            }
-            
-            truckRepository.deleteById(id);
+            truckService.deleteTruck(id);
             log.info("Deleted truck with ID: {}", id);
             return ResponseEntity.noContent().build();
+        } catch (RuntimeException e) {
+            log.warn("Truck not found for deletion with ID: {}", id);
+            return ResponseEntity.notFound().build();
         } catch (Exception e) {
             log.error("Error deleting truck with ID: {}", id, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
@@ -135,162 +118,70 @@ public class TruckController {
     }
 
     /**
-     * Get trucks by status
-     * @param status Truck status (IDLE, EN_ROUTE, RETURNING)
-     * @return List of trucks with specified status
+     * Get all available trucks
+     * @return List of available trucks
      */
-    @GetMapping("/status/{status}")
-    public ResponseEntity<List<Truck>> getTrucksByStatus(@PathVariable String status) {
+    @GetMapping("/available")
+    public ResponseEntity<List<Truck>> getAvailableTrucks() {
         try {
-            List<Truck> trucks = truckRepository.findByStatus(status);
-            log.info("Retrieved {} trucks with status: {}", trucks.size(), status);
-            return ResponseEntity.ok(trucks);
+            List<Truck> availableTrucks = truckService.getAvailableTrucks();
+            log.info("Retrieved {} available trucks", availableTrucks.size());
+            return ResponseEntity.ok(availableTrucks);
         } catch (Exception e) {
-            log.error("Error retrieving trucks by status: {}", status, e);
+            log.error("Error retrieving available trucks", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 
     /**
-     * Get all idle trucks
-     * @return List of idle trucks
-     */
-    @GetMapping("/idle")
-    public ResponseEntity<List<Truck>> getIdleTrucks() {
-        try {
-            List<Truck> idleTrucks = truckRepository.findIdleTrucks();
-            log.info("Retrieved {} idle trucks", idleTrucks.size());
-            return ResponseEntity.ok(idleTrucks);
-        } catch (Exception e) {
-            log.error("Error retrieving idle trucks", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
-    }
-
-    /**
-     * Get trucks with available capacity above threshold
-     * @param minAvailableCapacity Minimum available capacity required
-     * @return List of trucks with sufficient available capacity
-     */
-    @GetMapping("/available-capacity")
-    public ResponseEntity<List<Truck>> getTrucksWithAvailableCapacity(@RequestParam double minAvailableCapacity) {
-        try {
-            List<Truck> trucks = truckRepository.findTrucksWithAvailableCapacity(minAvailableCapacity);
-            log.info("Retrieved {} trucks with available capacity >= {}", trucks.size(), minAvailableCapacity);
-            return ResponseEntity.ok(trucks);
-        } catch (Exception e) {
-            log.error("Error retrieving trucks by available capacity", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
-    }
-
-    /**
-     * Get trucks by capacity range
+     * Get trucks with capacity above threshold
      * @param minCapacity Minimum capacity
-     * @param maxCapacity Maximum capacity
-     * @return List of trucks within the capacity range
+     * @return List of trucks meeting capacity criteria
      */
-    @GetMapping("/capacity-range")
-    public ResponseEntity<List<Truck>> getTrucksByCapacityRange(
-            @RequestParam double minCapacity,
-            @RequestParam double maxCapacity) {
+    @GetMapping("/capacity/{minCapacity}")
+    public ResponseEntity<List<Truck>> getTrucksByCapacity(@PathVariable double minCapacity) {
         try {
-            List<Truck> trucks = truckRepository.findByMaxCapacityBetween(minCapacity, maxCapacity);
-            log.info("Retrieved {} trucks with capacity between {} and {}", trucks.size(), minCapacity, maxCapacity);
+            List<Truck> trucks = truckService.getTrucksByCapacity(minCapacity);
+            log.info("Retrieved {} trucks with capacity >= {}", trucks.size(), minCapacity);
             return ResponseEntity.ok(trucks);
         } catch (Exception e) {
-            log.error("Error retrieving trucks by capacity range", e);
+            log.error("Error retrieving trucks by capacity", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 
     /**
-     * Get underloaded trucks
-     * @param capacityPercentage Percentage of capacity threshold (0.0 to 1.0)
-     * @return List of underloaded trucks
+     * Get trucks with fuel level above threshold
+     * @param minFuelLevel Minimum fuel level
+     * @return List of trucks meeting fuel criteria
      */
-    @GetMapping("/underloaded")
-    public ResponseEntity<List<Truck>> getUnderloadedTrucks(@RequestParam(defaultValue = "0.5") double capacityPercentage) {
+    @GetMapping("/fuel/{minFuelLevel}")
+    public ResponseEntity<List<Truck>> getTrucksByFuelLevel(@PathVariable double minFuelLevel) {
         try {
-            List<Truck> trucks = truckRepository.findUnderloadedTrucks(capacityPercentage);
-            log.info("Retrieved {} underloaded trucks (threshold: {})", trucks.size(), capacityPercentage);
+            List<Truck> trucks = truckService.getTrucksByFuelLevel(minFuelLevel);
+            log.info("Retrieved {} trucks with fuel level >= {}", trucks.size(), minFuelLevel);
             return ResponseEntity.ok(trucks);
         } catch (Exception e) {
-            log.error("Error retrieving underloaded trucks", e);
+            log.error("Error retrieving trucks by fuel level", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 
     /**
-     * Get trucks near capacity
-     * @param capacityPercentage Percentage of capacity threshold (0.0 to 1.0)
-     * @return List of trucks near capacity
-     */
-    @GetMapping("/near-capacity")
-    public ResponseEntity<List<Truck>> getTrucksNearCapacity(@RequestParam(defaultValue = "0.8") double capacityPercentage) {
-        try {
-            List<Truck> trucks = truckRepository.findTrucksNearCapacity(capacityPercentage);
-            log.info("Retrieved {} trucks near capacity (threshold: {})", trucks.size(), capacityPercentage);
-            return ResponseEntity.ok(trucks);
-        } catch (Exception e) {
-            log.error("Error retrieving trucks near capacity", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
-    }
-
-    /**
-     * Update truck status
+     * Update truck current load
      * @param id Truck ID
-     * @param status New status
-     * @return Updated truck
-     */
-    @PatchMapping("/{id}/status")
-    public ResponseEntity<Truck> updateTruckStatus(@PathVariable Long id, @RequestParam String status) {
-        try {
-            Optional<Truck> truckOpt = truckRepository.findById(id);
-            if (truckOpt.isEmpty()) {
-                log.warn("Truck not found for status update with ID: {}", id);
-                return ResponseEntity.notFound().build();
-            }
-            
-            Truck truck = truckOpt.get();
-            truck.setStatus(status);
-            Truck updatedTruck = truckRepository.save(truck);
-            
-            log.info("Updated truck {} status to: {}", id, status);
-            return ResponseEntity.ok(updatedTruck);
-        } catch (Exception e) {
-            log.error("Error updating truck status with ID: {}", id, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
-    }
-
-    /**
-     * Update truck load
-     * @param id Truck ID
-     * @param currentLoad New current load
+     * @param load New current load
      * @return Updated truck
      */
     @PatchMapping("/{id}/load")
-    public ResponseEntity<Truck> updateTruckLoad(@PathVariable Long id, @RequestParam double currentLoad) {
+    public ResponseEntity<Truck> updateTruckLoad(@PathVariable Long id, @RequestParam double load) {
         try {
-            Optional<Truck> truckOpt = truckRepository.findById(id);
-            if (truckOpt.isEmpty()) {
-                log.warn("Truck not found for load update with ID: {}", id);
-                return ResponseEntity.notFound().build();
-            }
-            
-            Truck truck = truckOpt.get();
-            if (currentLoad > truck.getMaxCapacity()) {
-                log.warn("Load {} exceeds max capacity {} for truck {}", currentLoad, truck.getMaxCapacity(), id);
-                return ResponseEntity.badRequest().build();
-            }
-            
-            truck.setCurrentLoad(currentLoad);
-            Truck updatedTruck = truckRepository.save(truck);
-            
-            log.info("Updated truck {} load to: {}", id, currentLoad);
+            Truck updatedTruck = truckService.updateTruckLoad(id, load);
+            log.info("Updated truck {} load to: {}", id, load);
             return ResponseEntity.ok(updatedTruck);
+        } catch (RuntimeException e) {
+            log.warn("Truck not found for load update with ID: {}", id);
+            return ResponseEntity.notFound().build();
         } catch (Exception e) {
             log.error("Error updating truck load with ID: {}", id, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
@@ -298,68 +189,87 @@ public class TruckController {
     }
 
     /**
-     * Get trucks that can accommodate a specific weight
-     * @param weight Weight to be accommodated
-     * @return List of trucks that can carry the specified weight
+     * Update truck fuel level
+     * @param id Truck ID
+     * @param fuelLevel New fuel level
+     * @return Updated truck
      */
-    @GetMapping("/can-accommodate")
-    public ResponseEntity<List<Truck>> getTrucksThatCanAccommodateWeight(@RequestParam double weight) {
+    @PatchMapping("/{id}/fuel")
+    public ResponseEntity<Truck> updateTruckFuel(@PathVariable Long id, @RequestParam double fuelLevel) {
         try {
-            List<Truck> trucks = truckRepository.findTrucksThatCanAccommodateWeight(weight);
-            log.info("Retrieved {} trucks that can accommodate weight: {}", trucks.size(), weight);
-            return ResponseEntity.ok(trucks);
+            Truck updatedTruck = truckService.updateTruckFuel(id, fuelLevel);
+            log.info("Updated truck {} fuel level to: {}", id, fuelLevel);
+            return ResponseEntity.ok(updatedTruck);
+        } catch (RuntimeException e) {
+            if (e.getMessage().contains("not found")) {
+                log.warn("Truck not found for fuel update with ID: {}", id);
+                return ResponseEntity.notFound().build();
+            } else {
+                log.warn("Fuel level functionality not implemented: {}", e.getMessage());
+                return ResponseEntity.badRequest().build();
+            }
         } catch (Exception e) {
-            log.error("Error retrieving trucks by weight accommodation", e);
+            log.error("Error updating truck fuel with ID: {}", id, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 
     /**
-     * Get truck count by status
-     * @param status Truck status
+     * Update truck availability status
+     * @param id Truck ID
+     * @param isAvailable New availability status
+     * @return Updated truck
+     */
+    @PatchMapping("/{id}/availability")
+    public ResponseEntity<Truck> updateTruckAvailability(@PathVariable Long id, @RequestParam boolean isAvailable) {
+        try {
+            Truck updatedTruck = truckService.updateTruckAvailability(id, isAvailable);
+            log.info("Updated truck {} availability to: {}", id, isAvailable);
+            return ResponseEntity.ok(updatedTruck);
+        } catch (RuntimeException e) {
+            log.warn("Truck not found for availability update with ID: {}", id);
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            log.error("Error updating truck availability with ID: {}", id, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /**
+     * Get trucks within a certain radius
+     * @param latitude Center latitude
+     * @param longitude Center longitude
+     * @param radiusKm Radius in kilometers
+     * @return List of trucks within the radius
+     */
+    @GetMapping("/nearby")
+    public ResponseEntity<List<Truck>> getTrucksNearby(
+            @RequestParam double latitude,
+            @RequestParam double longitude,
+            @RequestParam double radiusKm) {
+        try {
+            List<Truck> nearbyTrucks = truckService.getTrucksNearby(latitude, longitude, radiusKm);
+            log.info("Retrieved {} trucks within {}km radius", nearbyTrucks.size(), radiusKm);
+            return ResponseEntity.ok(nearbyTrucks);
+        } catch (Exception e) {
+            log.error("Error retrieving nearby trucks", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /**
+     * Get truck count by availability
+     * @param isAvailable Availability status
      * @return Count of trucks with specified status
      */
     @GetMapping("/count")
-    public ResponseEntity<Long> getTruckCount(@RequestParam String status) {
+    public ResponseEntity<Long> getTruckCount(@RequestParam boolean isAvailable) {
         try {
-            long count = truckRepository.countByStatus(status);
-            log.info("Count of trucks with status {}: {}", status, count);
+            long count = truckService.getTruckCount(isAvailable);
+            log.info("Count of trucks with availability {}: {}", isAvailable, count);
             return ResponseEntity.ok(count);
         } catch (Exception e) {
-            log.error("Error counting trucks by status: {}", status, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
-    }
-
-    /**
-     * Get fully loaded trucks
-     * @return List of fully loaded trucks
-     */
-    @GetMapping("/fully-loaded")
-    public ResponseEntity<List<Truck>> getFullyLoadedTrucks() {
-        try {
-            List<Truck> trucks = truckRepository.findFullyLoadedTrucks();
-            log.info("Retrieved {} fully loaded trucks", trucks.size());
-            return ResponseEntity.ok(trucks);
-        } catch (Exception e) {
-            log.error("Error retrieving fully loaded trucks", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
-    }
-
-    /**
-     * Get empty trucks
-     * @param maxLoadThreshold Maximum load threshold to consider as empty
-     * @return List of empty or nearly empty trucks
-     */
-    @GetMapping("/empty")
-    public ResponseEntity<List<Truck>> getEmptyTrucks(@RequestParam(defaultValue = "0.1") double maxLoadThreshold) {
-        try {
-            List<Truck> trucks = truckRepository.findEmptyTrucks(maxLoadThreshold);
-            log.info("Retrieved {} empty trucks (threshold: {})", trucks.size(), maxLoadThreshold);
-            return ResponseEntity.ok(trucks);
-        } catch (Exception e) {
-            log.error("Error retrieving empty trucks", e);
+            log.error("Error counting trucks by availability: {}", isAvailable, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
