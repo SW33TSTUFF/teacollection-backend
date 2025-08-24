@@ -1,7 +1,7 @@
 package com.teacollection.teacollection_backend.controller;
 
 import com.teacollection.teacollection_backend.Supplier;
-import com.teacollection.teacollection_backend.repository.SupplierRepository;
+import com.teacollection.teacollection_backend.service.SupplierService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -10,7 +10,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * REST Controller for Supplier management operations.
@@ -23,7 +22,7 @@ import java.util.Optional;
 @CrossOrigin(origins = "*")
 public class SupplierController {
 
-    private final SupplierRepository supplierRepository;
+    private final SupplierService supplierService;
 
     /**
      * Get all suppliers
@@ -32,7 +31,7 @@ public class SupplierController {
     @GetMapping
     public ResponseEntity<List<Supplier>> getAllSuppliers() {
         try {
-            List<Supplier> suppliers = supplierRepository.findAll();
+            List<Supplier> suppliers = supplierService.getAllSuppliers();
             log.info("Retrieved {} suppliers", suppliers.size());
             return ResponseEntity.ok(suppliers);
         } catch (Exception e) {
@@ -49,14 +48,12 @@ public class SupplierController {
     @GetMapping("/{id}")
     public ResponseEntity<Supplier> getSupplierById(@PathVariable Long id) {
         try {
-            Optional<Supplier> supplier = supplierRepository.findById(id);
-            if (supplier.isPresent()) {
-                log.info("Retrieved supplier with ID: {}", id);
-                return ResponseEntity.ok(supplier.get());
-            } else {
-                log.warn("Supplier not found with ID: {}", id);
-                return ResponseEntity.notFound().build();
-            }
+            Supplier supplier = supplierService.getSupplierById(id);
+            log.info("Retrieved supplier with ID: {}", id);
+            return ResponseEntity.ok(supplier);
+        } catch (RuntimeException e) {
+            log.warn("Supplier not found with ID: {}", id);
+            return ResponseEntity.notFound().build();
         } catch (Exception e) {
             log.error("Error retrieving supplier with ID: {}", id, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
@@ -71,15 +68,7 @@ public class SupplierController {
     @PostMapping
     public ResponseEntity<Supplier> createSupplier(@RequestBody Supplier supplier) {
         try {
-            // Set default values if not provided
-            if (supplier.getAvailableFrom() == null) {
-                supplier.setAvailableFrom(LocalDateTime.now());
-            }
-            if (supplier.getAvailableUntil() == null) {
-                supplier.setAvailableUntil(LocalDateTime.now().plusHours(8)); // Default 8-hour window
-            }
-            
-            Supplier savedSupplier = supplierRepository.save(supplier);
+            Supplier savedSupplier = supplierService.createSupplier(supplier);
             log.info("Created new supplier with ID: {}", savedSupplier.getId());
             return ResponseEntity.status(HttpStatus.CREATED).body(savedSupplier);
         } catch (Exception e) {
@@ -97,15 +86,12 @@ public class SupplierController {
     @PutMapping("/{id}")
     public ResponseEntity<Supplier> updateSupplier(@PathVariable Long id, @RequestBody Supplier supplier) {
         try {
-            if (!supplierRepository.existsById(id)) {
-                log.warn("Supplier not found for update with ID: {}", id);
-                return ResponseEntity.notFound().build();
-            }
-            
-            supplier.setId(id);
-            Supplier updatedSupplier = supplierRepository.save(supplier);
+            Supplier updatedSupplier = supplierService.updateSupplier(id, supplier);
             log.info("Updated supplier with ID: {}", id);
             return ResponseEntity.ok(updatedSupplier);
+        } catch (RuntimeException e) {
+            log.warn("Supplier not found for update with ID: {}", id);
+            return ResponseEntity.notFound().build();
         } catch (Exception e) {
             log.error("Error updating supplier with ID: {}", id, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
@@ -120,14 +106,12 @@ public class SupplierController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteSupplier(@PathVariable Long id) {
         try {
-            if (!supplierRepository.existsById(id)) {
-                log.warn("Supplier not found for deletion with ID: {}", id);
-                return ResponseEntity.notFound().build();
-            }
-            
-            supplierRepository.deleteById(id);
+            supplierService.deleteSupplier(id);
             log.info("Deleted supplier with ID: {}", id);
             return ResponseEntity.noContent().build();
+        } catch (RuntimeException e) {
+            log.warn("Supplier not found for deletion with ID: {}", id);
+            return ResponseEntity.notFound().build();
         } catch (Exception e) {
             log.error("Error deleting supplier with ID: {}", id, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
@@ -141,7 +125,7 @@ public class SupplierController {
     @GetMapping("/ready")
     public ResponseEntity<List<Supplier>> getReadySuppliers() {
         try {
-            List<Supplier> readySuppliers = supplierRepository.findByIsReadyTrue();
+            List<Supplier> readySuppliers = supplierService.getReadySuppliers();
             log.info("Retrieved {} ready suppliers", readySuppliers.size());
             return ResponseEntity.ok(readySuppliers);
         } catch (Exception e) {
@@ -158,7 +142,7 @@ public class SupplierController {
     @GetMapping("/status/{isReady}")
     public ResponseEntity<List<Supplier>> getSuppliersByStatus(@PathVariable boolean isReady) {
         try {
-            List<Supplier> suppliers = supplierRepository.findSuppliersByStatusAndAvailability(isReady, LocalDateTime.now());
+            List<Supplier> suppliers = supplierService.getSuppliersByStatus(isReady);
             log.info("Retrieved {} suppliers with status: {}", suppliers.size(), isReady);
             return ResponseEntity.ok(suppliers);
         } catch (Exception e) {
@@ -180,7 +164,7 @@ public class SupplierController {
             @RequestParam double longitude,
             @RequestParam double radiusKm) {
         try {
-            List<Supplier> nearbySuppliers = supplierRepository.findSuppliersWithinRadius(latitude, longitude, radiusKm);
+            List<Supplier> nearbySuppliers = supplierService.getSuppliersNearby(latitude, longitude, radiusKm);
             log.info("Retrieved {} suppliers within {}km radius", nearbySuppliers.size(), radiusKm);
             return ResponseEntity.ok(nearbySuppliers);
         } catch (Exception e) {
@@ -197,7 +181,7 @@ public class SupplierController {
     @GetMapping("/weight")
     public ResponseEntity<List<Supplier>> getSuppliersByWeight(@RequestParam double minWeight) {
         try {
-            List<Supplier> suppliers = supplierRepository.findByHarvestWeightGreaterThanEqual(minWeight);
+            List<Supplier> suppliers = supplierService.getSuppliersByWeight(minWeight);
             log.info("Retrieved {} suppliers with weight >= {}", suppliers.size(), minWeight);
             return ResponseEntity.ok(suppliers);
         } catch (Exception e) {
@@ -215,18 +199,12 @@ public class SupplierController {
     @PatchMapping("/{id}/status")
     public ResponseEntity<Supplier> updateSupplierStatus(@PathVariable Long id, @RequestParam boolean isReady) {
         try {
-            Optional<Supplier> supplierOpt = supplierRepository.findById(id);
-            if (supplierOpt.isEmpty()) {
-                log.warn("Supplier not found for status update with ID: {}", id);
-                return ResponseEntity.notFound().build();
-            }
-            
-            Supplier supplier = supplierOpt.get();
-            supplier.setReady(isReady);
-            Supplier updatedSupplier = supplierRepository.save(supplier);
-            
+            Supplier updatedSupplier = supplierService.updateSupplierStatus(id, isReady);
             log.info("Updated supplier {} status to: {}", id, isReady);
             return ResponseEntity.ok(updatedSupplier);
+        } catch (RuntimeException e) {
+            log.warn("Supplier not found for status update with ID: {}", id);
+            return ResponseEntity.notFound().build();
         } catch (Exception e) {
             log.error("Error updating supplier status with ID: {}", id, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
@@ -241,10 +219,7 @@ public class SupplierController {
     @GetMapping("/becoming-available")
     public ResponseEntity<List<Supplier>> getSuppliersBecomingAvailable(@RequestParam(defaultValue = "30") int minutesAhead) {
         try {
-            LocalDateTime currentTime = LocalDateTime.now();
-            LocalDateTime futureTime = currentTime.plusMinutes(minutesAhead);
-            
-            List<Supplier> suppliers = supplierRepository.findSuppliersBecomingAvailableSoon(currentTime, futureTime);
+            List<Supplier> suppliers = supplierService.getSuppliersBecomingAvailable(minutesAhead);
             log.info("Retrieved {} suppliers becoming available within {} minutes", suppliers.size(), minutesAhead);
             return ResponseEntity.ok(suppliers);
         } catch (Exception e) {
@@ -261,7 +236,7 @@ public class SupplierController {
     @GetMapping("/count")
     public ResponseEntity<Long> getSupplierCount(@RequestParam boolean isReady) {
         try {
-            long count = supplierRepository.countByIsReady(isReady);
+            long count = supplierService.getSupplierCount(isReady);
             log.info("Count of suppliers with status {}: {}", isReady, count);
             return ResponseEntity.ok(count);
         } catch (Exception e) {
@@ -281,7 +256,7 @@ public class SupplierController {
             @RequestParam LocalDateTime startTime,
             @RequestParam LocalDateTime endTime) {
         try {
-            List<Supplier> suppliers = supplierRepository.findAvailableSuppliersInTimeWindow(startTime, endTime);
+            List<Supplier> suppliers = supplierService.getSuppliersAvailableInWindow(startTime, endTime);
             log.info("Retrieved {} suppliers available in time window", suppliers.size());
             return ResponseEntity.ok(suppliers);
         } catch (Exception e) {
