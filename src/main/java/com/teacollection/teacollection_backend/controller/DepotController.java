@@ -1,7 +1,7 @@
 package com.teacollection.teacollection_backend.controller;
 
 import com.teacollection.teacollection_backend.Depot;
-import com.teacollection.teacollection_backend.repository.DepotRepository;
+import com.teacollection.teacollection_backend.service.DepotService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -9,20 +9,19 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Optional;
 
 /**
  * REST Controller for Depot management operations.
- * Handles CRUD operations and location-based queries.
+ * Handles CRUD operations and depot queries.
  */
 @RestController
-@RequestMapping("/api/depots")
+@RequestMapping({"/api/depots", "/api/depots/"})
 @RequiredArgsConstructor
 @Slf4j
 @CrossOrigin(origins = "*")
 public class DepotController {
 
-    private final DepotRepository depotRepository;
+    private final DepotService depotService;
 
     /**
      * Get all depots
@@ -31,7 +30,7 @@ public class DepotController {
     @GetMapping
     public ResponseEntity<List<Depot>> getAllDepots() {
         try {
-            List<Depot> depots = depotRepository.findAll();
+            List<Depot> depots = depotService.getAllDepots();
             log.info("Retrieved {} depots", depots.size());
             return ResponseEntity.ok(depots);
         } catch (Exception e) {
@@ -48,14 +47,12 @@ public class DepotController {
     @GetMapping("/{id}")
     public ResponseEntity<Depot> getDepotById(@PathVariable Long id) {
         try {
-            Optional<Depot> depot = depotRepository.findById(id);
-            if (depot.isPresent()) {
-                log.info("Retrieved depot with ID: {}", id);
-                return ResponseEntity.ok(depot.get());
-            } else {
-                log.warn("Depot not found with ID: {}", id);
-                return ResponseEntity.notFound().build();
-            }
+            Depot depot = depotService.getDepotById(id);
+            log.info("Retrieved depot with ID: {}", id);
+            return ResponseEntity.ok(depot);
+        } catch (RuntimeException e) {
+            log.warn("Depot not found with ID: {}", id);
+            return ResponseEntity.notFound().build();
         } catch (Exception e) {
             log.error("Error retrieving depot with ID: {}", id, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
@@ -70,9 +67,12 @@ public class DepotController {
     @PostMapping
     public ResponseEntity<Depot> createDepot(@RequestBody Depot depot) {
         try {
-            Depot savedDepot = depotRepository.save(depot);
+            Depot savedDepot = depotService.createDepot(depot);
             log.info("Created new depot with ID: {}", savedDepot.getId());
             return ResponseEntity.status(HttpStatus.CREATED).body(savedDepot);
+        } catch (RuntimeException e) {
+            log.warn("Validation error creating depot: {}", e.getMessage());
+            return ResponseEntity.badRequest().build();
         } catch (Exception e) {
             log.error("Error creating depot", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
@@ -88,15 +88,17 @@ public class DepotController {
     @PutMapping("/{id}")
     public ResponseEntity<Depot> updateDepot(@PathVariable Long id, @RequestBody Depot depot) {
         try {
-            if (!depotRepository.existsById(id)) {
-                log.warn("Depot not found for update with ID: {}", id);
-                return ResponseEntity.notFound().build();
-            }
-            
-            depot.setId(id);
-            Depot updatedDepot = depotRepository.save(depot);
+            Depot updatedDepot = depotService.updateDepot(id, depot);
             log.info("Updated depot with ID: {}", id);
             return ResponseEntity.ok(updatedDepot);
+        } catch (RuntimeException e) {
+            if (e.getMessage().contains("not found")) {
+                log.warn("Depot not found for update with ID: {}", id);
+                return ResponseEntity.notFound().build();
+            } else {
+                log.warn("Validation error updating depot: {}", e.getMessage());
+                return ResponseEntity.badRequest().build();
+            }
         } catch (Exception e) {
             log.error("Error updating depot with ID: {}", id, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
@@ -111,14 +113,12 @@ public class DepotController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteDepot(@PathVariable Long id) {
         try {
-            if (!depotRepository.existsById(id)) {
-                log.warn("Depot not found for deletion with ID: {}", id);
-                return ResponseEntity.notFound().build();
-            }
-            
-            depotRepository.deleteById(id);
+            depotService.deleteDepot(id);
             log.info("Deleted depot with ID: {}", id);
             return ResponseEntity.noContent().build();
+        } catch (RuntimeException e) {
+            log.warn("Depot not found for deletion with ID: {}", id);
+            return ResponseEntity.notFound().build();
         } catch (Exception e) {
             log.error("Error deleting depot with ID: {}", id, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
@@ -126,32 +126,66 @@ public class DepotController {
     }
 
     /**
-     * Find depot by exact coordinates
-     * @param latitude Depot latitude
-     * @param longitude Depot longitude
-     * @return Depot if found, 404 if not found
+     * Get all active depots
+     * @return List of active depots
      */
-    @GetMapping("/coordinates")
-    public ResponseEntity<Depot> getDepotByCoordinates(
-            @RequestParam double latitude,
-            @RequestParam double longitude) {
+    @GetMapping("/active")
+    public ResponseEntity<List<Depot>> getActiveDepots() {
         try {
-            Optional<Depot> depot = depotRepository.findByLatitudeAndLongitude(latitude, longitude);
-            if (depot.isPresent()) {
-                log.info("Retrieved depot at coordinates: {}, {}", latitude, longitude);
-                return ResponseEntity.ok(depot.get());
-            } else {
-                log.warn("Depot not found at coordinates: {}, {}", latitude, longitude);
-                return ResponseEntity.notFound().build();
-            }
+            List<Depot> activeDepots = depotService.getActiveDepots();
+            log.info("Retrieved {} active depots", activeDepots.size());
+            return ResponseEntity.ok(activeDepots);
         } catch (Exception e) {
-            log.error("Error retrieving depot by coordinates", e);
+            log.error("Error retrieving active depots", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 
     /**
-     * Find depots within a certain radius
+     * Get depots with capacity above threshold
+     * @param minCapacity Minimum capacity
+     * @return List of depots meeting capacity criteria
+     */
+    @GetMapping("/capacity/{minCapacity}")
+    public ResponseEntity<List<Depot>> getDepotsByCapacity(@PathVariable double minCapacity) {
+        try {
+            List<Depot> depots = depotService.getDepotsByCapacity(minCapacity);
+            log.info("Retrieved {} depots with capacity >= {}", depots.size(), minCapacity);
+            return ResponseEntity.ok(depots);
+        } catch (Exception e) {
+            log.error("Error retrieving depots by capacity", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /**
+     * Update depot active status
+     * @param id Depot ID
+     * @param isActive New active status
+     * @return Updated depot
+     */
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<Depot> updateDepotStatus(@PathVariable Long id, @RequestParam boolean isActive) {
+        try {
+            Depot updatedDepot = depotService.updateDepotStatus(id, isActive);
+            log.info("Updated depot {} active status to: {}", id, isActive);
+            return ResponseEntity.ok(updatedDepot);
+        } catch (RuntimeException e) {
+            if (e.getMessage().contains("not found")) {
+                log.warn("Depot not found for status update with ID: {}", id);
+                return ResponseEntity.notFound().build();
+            } else {
+                log.warn("Active status functionality not implemented: {}", e.getMessage());
+                return ResponseEntity.badRequest().build();
+            }
+        } catch (Exception e) {
+            log.error("Error updating depot status with ID: {}", id, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /**
+     * Get depots within a certain radius
      * @param latitude Center latitude
      * @param longitude Center longitude
      * @param radiusKm Radius in kilometers
@@ -163,148 +197,11 @@ public class DepotController {
             @RequestParam double longitude,
             @RequestParam double radiusKm) {
         try {
-            List<Depot> nearbyDepots = depotRepository.findDepotsWithinRadius(latitude, longitude, radiusKm);
+            List<Depot> nearbyDepots = depotService.getDepotsNearby(latitude, longitude, radiusKm);
             log.info("Retrieved {} depots within {}km radius", nearbyDepots.size(), radiusKm);
             return ResponseEntity.ok(nearbyDepots);
         } catch (Exception e) {
             log.error("Error retrieving nearby depots", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
-    }
-
-    /**
-     * Find the closest depot to given coordinates
-     * @param latitude Target latitude
-     * @param longitude Target longitude
-     * @return Closest depot if found, 404 if no depots exist
-     */
-    @GetMapping("/closest")
-    public ResponseEntity<Depot> getClosestDepot(
-            @RequestParam double latitude,
-            @RequestParam double longitude) {
-        try {
-            Optional<Depot> depot = depotRepository.findClosestDepot(latitude, longitude);
-            if (depot.isPresent()) {
-                log.info("Retrieved closest depot to coordinates: {}, {}", latitude, longitude);
-                return ResponseEntity.ok(depot.get());
-            } else {
-                log.warn("No depots found for closest calculation");
-                return ResponseEntity.notFound().build();
-            }
-        } catch (Exception e) {
-            log.error("Error finding closest depot", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
-    }
-
-    /**
-     * Find depots in a rectangular area
-     * @param minLatitude Minimum latitude
-     * @param maxLatitude Maximum latitude
-     * @param minLongitude Minimum longitude
-     * @param maxLongitude Maximum longitude
-     * @return List of depots within the rectangular area
-     */
-    @GetMapping("/area")
-    public ResponseEntity<List<Depot>> getDepotsInArea(
-            @RequestParam double minLatitude,
-            @RequestParam double maxLatitude,
-            @RequestParam double minLongitude,
-            @RequestParam double maxLongitude) {
-        try {
-            List<Depot> depots = depotRepository.findDepotsInRectangularArea(
-                    minLatitude, maxLatitude, minLongitude, maxLongitude);
-            log.info("Retrieved {} depots in rectangular area", depots.size());
-            return ResponseEntity.ok(depots);
-        } catch (Exception e) {
-            log.error("Error retrieving depots in area", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
-    }
-
-    /**
-     * Find depots by latitude range
-     * @param minLatitude Minimum latitude
-     * @param maxLatitude Maximum latitude
-     * @return List of depots within the latitude range
-     */
-    @GetMapping("/latitude-range")
-    public ResponseEntity<List<Depot>> getDepotsByLatitudeRange(
-            @RequestParam double minLatitude,
-            @RequestParam double maxLatitude) {
-        try {
-            List<Depot> depots = depotRepository.findByLatitudeBetween(minLatitude, maxLatitude);
-            log.info("Retrieved {} depots in latitude range: {} to {}", depots.size(), minLatitude, maxLatitude);
-            return ResponseEntity.ok(depots);
-        } catch (Exception e) {
-            log.error("Error retrieving depots by latitude range", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
-    }
-
-    /**
-     * Find depots by longitude range
-     * @param minLongitude Minimum longitude
-     * @param maxLongitude Maximum longitude
-     * @return List of depots within the longitude range
-     */
-    @GetMapping("/longitude-range")
-    public ResponseEntity<List<Depot>> getDepotsByLongitudeRange(
-            @RequestParam double minLongitude,
-            @RequestParam double maxLongitude) {
-        try {
-            List<Depot> depots = depotRepository.findByLongitudeBetween(minLongitude, maxLongitude);
-            log.info("Retrieved {} depots in longitude range: {} to {}", depots.size(), minLongitude, maxLongitude);
-            return ResponseEntity.ok(depots);
-        } catch (Exception e) {
-            log.error("Error retrieving depots by longitude range", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
-    }
-
-    /**
-     * Find depots by approximate location with tolerance
-     * @param latitude Target latitude
-     * @param longitude Target longitude
-     * @param tolerance Tolerance in degrees
-     * @return List of depots within tolerance
-     */
-    @GetMapping("/approximate")
-    public ResponseEntity<List<Depot>> getDepotsByApproximateLocation(
-            @RequestParam double latitude,
-            @RequestParam double longitude,
-            @RequestParam(defaultValue = "0.01") double tolerance) {
-        try {
-            List<Depot> depots = depotRepository.findDepotsByApproximateLocation(latitude, longitude, tolerance);
-            log.info("Retrieved {} depots near coordinates: {}, {} (tolerance: {})", 
-                    depots.size(), latitude, longitude, tolerance);
-            return ResponseEntity.ok(depots);
-        } catch (Exception e) {
-            log.error("Error retrieving depots by approximate location", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
-    }
-
-    /**
-     * Count depots in a specific region
-     * @param minLatitude Minimum latitude
-     * @param maxLatitude Maximum latitude
-     * @param minLongitude Minimum longitude
-     * @param maxLongitude Maximum longitude
-     * @return Count of depots in the region
-     */
-    @GetMapping("/count-in-region")
-    public ResponseEntity<Long> countDepotsInRegion(
-            @RequestParam double minLatitude,
-            @RequestParam double maxLatitude,
-            @RequestParam double minLongitude,
-            @RequestParam double maxLongitude) {
-        try {
-            long count = depotRepository.countDepotsInRegion(minLatitude, maxLatitude, minLongitude, maxLongitude);
-            log.info("Count of depots in region: {}", count);
-            return ResponseEntity.ok(count);
-        } catch (Exception e) {
-            log.error("Error counting depots in region", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
