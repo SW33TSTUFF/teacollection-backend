@@ -1,29 +1,27 @@
 package com.teacollection.teacollection_backend.controller;
 
 import com.teacollection.teacollection_backend.Route;
-import com.teacollection.teacollection_backend.repository.RouteRepository;
+import com.teacollection.teacollection_backend.service.RouteService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * REST Controller for Route management operations.
- * Handles CRUD operations, status updates, and route optimization.
+ * Handles CRUD operations, status updates, and route queries.
  */
 @RestController
-@RequestMapping("/api/routes")
+@RequestMapping({"/api/routes", "/api/routes/"})
 @RequiredArgsConstructor
 @Slf4j
 @CrossOrigin(origins = "*")
 public class RouteController {
 
-    private final RouteRepository routeRepository;
+    private final RouteService routeService;
 
     /**
      * Get all routes
@@ -32,7 +30,7 @@ public class RouteController {
     @GetMapping
     public ResponseEntity<List<Route>> getAllRoutes() {
         try {
-            List<Route> routes = routeRepository.findAll();
+            List<Route> routes = routeService.getAllRoutes();
             log.info("Retrieved {} routes", routes.size());
             return ResponseEntity.ok(routes);
         } catch (Exception e) {
@@ -49,14 +47,12 @@ public class RouteController {
     @GetMapping("/{id}")
     public ResponseEntity<Route> getRouteById(@PathVariable Long id) {
         try {
-            Optional<Route> route = routeRepository.findById(id);
-            if (route.isPresent()) {
-                log.info("Retrieved route with ID: {}", id);
-                return ResponseEntity.ok(route.get());
-            } else {
-                log.warn("Route not found with ID: {}", id);
-                return ResponseEntity.notFound().build();
-            }
+            Route route = routeService.getRouteById(id);
+            log.info("Retrieved route with ID: {}", id);
+            return ResponseEntity.ok(route);
+        } catch (RuntimeException e) {
+            log.warn("Route not found with ID: {}", id);
+            return ResponseEntity.notFound().build();
         } catch (Exception e) {
             log.error("Error retrieving route with ID: {}", id, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
@@ -71,20 +67,12 @@ public class RouteController {
     @PostMapping
     public ResponseEntity<Route> createRoute(@RequestBody Route route) {
         try {
-            // Set default values if not provided
-            if (route.getStatus() == null) {
-                route.setStatus(Route.RouteStatus.PLANNED);
-            }
-            if (route.getTotalWeight() == 0.0) {
-                route.setTotalWeight(0.0);
-            }
-            if (route.getTotalDistance() == 0.0) {
-                route.setTotalDistance(0.0);
-            }
-            
-            Route savedRoute = routeRepository.save(route);
+            Route savedRoute = routeService.createRoute(route);
             log.info("Created new route with ID: {}", savedRoute.getId());
             return ResponseEntity.status(HttpStatus.CREATED).body(savedRoute);
+        } catch (RuntimeException e) {
+            log.warn("Validation error creating route: {}", e.getMessage());
+            return ResponseEntity.badRequest().build();
         } catch (Exception e) {
             log.error("Error creating route", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
@@ -100,15 +88,17 @@ public class RouteController {
     @PutMapping("/{id}")
     public ResponseEntity<Route> updateRoute(@PathVariable Long id, @RequestBody Route route) {
         try {
-            if (!routeRepository.existsById(id)) {
-                log.warn("Route not found for update with ID: {}", id);
-                return ResponseEntity.notFound().build();
-            }
-            
-            route.setId(id);
-            Route updatedRoute = routeRepository.save(route);
+            Route updatedRoute = routeService.updateRoute(id, route);
             log.info("Updated route with ID: {}", id);
             return ResponseEntity.ok(updatedRoute);
+        } catch (RuntimeException e) {
+            if (e.getMessage().contains("not found")) {
+                log.warn("Route not found for update with ID: {}", id);
+                return ResponseEntity.notFound().build();
+            } else {
+                log.warn("Validation error updating route: {}", e.getMessage());
+                return ResponseEntity.badRequest().build();
+            }
         } catch (Exception e) {
             log.error("Error updating route with ID: {}", id, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
@@ -123,14 +113,12 @@ public class RouteController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteRoute(@PathVariable Long id) {
         try {
-            if (!routeRepository.existsById(id)) {
-                log.warn("Route not found for deletion with ID: {}", id);
-                return ResponseEntity.notFound().build();
-            }
-            
-            routeRepository.deleteById(id);
+            routeService.deleteRoute(id);
             log.info("Deleted route with ID: {}", id);
             return ResponseEntity.noContent().build();
+        } catch (RuntimeException e) {
+            log.warn("Route not found for deletion with ID: {}", id);
+            return ResponseEntity.notFound().build();
         } catch (Exception e) {
             log.error("Error deleting route with ID: {}", id, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
@@ -139,13 +127,13 @@ public class RouteController {
 
     /**
      * Get routes by status
-     * @param status Route status
+     * @param status Route status (PLANNED, IN_PROGRESS, COMPLETED, CANCELLED, FAILED)
      * @return List of routes with specified status
      */
     @GetMapping("/status/{status}")
-    public ResponseEntity<List<Route>> getRoutesByStatus(@PathVariable Route.RouteStatus status) {
+    public ResponseEntity<List<Route>> getRoutesByStatus(@PathVariable String status) {
         try {
-            List<Route> routes = routeRepository.findByStatus(status);
+            List<Route> routes = routeService.getRoutesByStatus(status);
             log.info("Retrieved {} routes with status: {}", routes.size(), status);
             return ResponseEntity.ok(routes);
         } catch (Exception e) {
@@ -155,83 +143,35 @@ public class RouteController {
     }
 
     /**
-     * Get active routes (PLANNED or IN_PROGRESS)
-     * @return List of active routes
-     */
-    @GetMapping("/active")
-    public ResponseEntity<List<Route>> getActiveRoutes() {
-        try {
-            List<Route> activeRoutes = routeRepository.findActiveRoutes();
-            log.info("Retrieved {} active routes", activeRoutes.size());
-            return ResponseEntity.ok(activeRoutes);
-        } catch (Exception e) {
-            log.error("Error retrieving active routes", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
-    }
-
-    /**
-     * Get routes by truck ID
+     * Get routes for a specific truck
      * @param truckId Truck ID
-     * @return List of routes assigned to the truck
+     * @return List of routes for the truck
      */
     @GetMapping("/truck/{truckId}")
-    public ResponseEntity<List<Route>> getRoutesByTruckId(@PathVariable Long truckId) {
+    public ResponseEntity<List<Route>> getRoutesByTruck(@PathVariable Long truckId) {
         try {
-            List<Route> routes = routeRepository.findByTruckId(truckId);
+            List<Route> routes = routeService.getRoutesByTruck(truckId);
             log.info("Retrieved {} routes for truck ID: {}", routes.size(), truckId);
             return ResponseEntity.ok(routes);
         } catch (Exception e) {
-            log.error("Error retrieving routes by truck ID: {}", truckId, e);
+            log.error("Error retrieving routes for truck ID: {}", truckId, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 
     /**
-     * Get routes by supplier ID
-     * @param supplierId Supplier ID
-     * @return List of routes containing the supplier
+     * Get routes for a specific depot
+     * @param depotId Depot ID
+     * @return List of routes for the depot
      */
-    @GetMapping("/supplier/{supplierId}")
-    public ResponseEntity<List<Route>> getRoutesBySupplierId(@PathVariable Long supplierId) {
+    @GetMapping("/depot/{depotId}")
+    public ResponseEntity<List<Route>> getRoutesByDepot(@PathVariable Long depotId) {
         try {
-            List<Route> routes = routeRepository.findBySupplierId(supplierId);
-            log.info("Retrieved {} routes containing supplier ID: {}", routes.size(), supplierId);
+            List<Route> routes = routeService.getRoutesByDepot(depotId);
+            log.info("Retrieved {} routes for depot ID: {}", routes.size(), depotId);
             return ResponseEntity.ok(routes);
         } catch (Exception e) {
-            log.error("Error retrieving routes by supplier ID: {}", supplierId, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
-    }
-
-    /**
-     * Get routes ready to start
-     * @return List of routes ready to start
-     */
-    @GetMapping("/ready-to-start")
-    public ResponseEntity<List<Route>> getRoutesReadyToStart() {
-        try {
-            List<Route> routes = routeRepository.findRoutesReadyToStart(LocalDateTime.now());
-            log.info("Retrieved {} routes ready to start", routes.size());
-            return ResponseEntity.ok(routes);
-        } catch (Exception e) {
-            log.error("Error retrieving routes ready to start", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
-    }
-
-    /**
-     * Get overdue routes
-     * @return List of overdue routes
-     */
-    @GetMapping("/overdue")
-    public ResponseEntity<List<Route>> getOverdueRoutes() {
-        try {
-            List<Route> routes = routeRepository.findOverdueRoutes(LocalDateTime.now());
-            log.info("Retrieved {} overdue routes", routes.size());
-            return ResponseEntity.ok(routes);
-        } catch (Exception e) {
-            log.error("Error retrieving overdue routes", e);
+            log.error("Error retrieving routes for depot ID: {}", depotId, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
@@ -239,31 +179,23 @@ public class RouteController {
     /**
      * Update route status
      * @param id Route ID
-     * @param status New status
+     * @param status New route status
      * @return Updated route
      */
     @PatchMapping("/{id}/status")
-    public ResponseEntity<Route> updateRouteStatus(@PathVariable Long id, @RequestParam Route.RouteStatus status) {
+    public ResponseEntity<Route> updateRouteStatus(@PathVariable Long id, @RequestParam String status) {
         try {
-            Optional<Route> routeOpt = routeRepository.findById(id);
-            if (routeOpt.isEmpty()) {
-                log.warn("Route not found for status update with ID: {}", id);
-                return ResponseEntity.notFound().build();
-            }
-            
-            Route route = routeOpt.get();
-            route.setStatus(status);
-            
-            // Set actual start/end times based on status
-            if (status == Route.RouteStatus.IN_PROGRESS && route.getActualStartTime() == null) {
-                route.setActualStartTime(LocalDateTime.now());
-            } else if (status == Route.RouteStatus.COMPLETED && route.getActualEndTime() == null) {
-                route.setActualEndTime(LocalDateTime.now());
-            }
-            
-            Route updatedRoute = routeRepository.save(route);
+            Route updatedRoute = routeService.updateRouteStatus(id, status);
             log.info("Updated route {} status to: {}", id, status);
             return ResponseEntity.ok(updatedRoute);
+        } catch (RuntimeException e) {
+            if (e.getMessage().contains("not found")) {
+                log.warn("Route not found for status update with ID: {}", id);
+                return ResponseEntity.notFound().build();
+            } else {
+                log.warn("Validation error updating route status: {}", e.getMessage());
+                return ResponseEntity.badRequest().build();
+            }
         } catch (Exception e) {
             log.error("Error updating route status with ID: {}", id, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
@@ -271,126 +203,37 @@ public class RouteController {
     }
 
     /**
-     * Get routes by weight range
-     * @param minWeight Minimum total weight
-     * @param maxWeight Maximum total weight
-     * @return List of routes within the weight range
+     * Get routes for a specific date
+     * @param date Date in YYYY-MM-DD format
+     * @return List of routes for the date
      */
-    @GetMapping("/weight-range")
-    public ResponseEntity<List<Route>> getRoutesByWeightRange(
-            @RequestParam double minWeight,
-            @RequestParam double maxWeight) {
+    @GetMapping("/date/{date}")
+    public ResponseEntity<List<Route>> getRoutesByDate(@PathVariable String date) {
         try {
-            List<Route> routes = routeRepository.findByTotalWeightBetween(minWeight, maxWeight);
-            log.info("Retrieved {} routes with weight between {} and {}", routes.size(), minWeight, maxWeight);
+            List<Route> routes = routeService.getRoutesByDate(date);
+            log.info("Retrieved {} routes for date: {}", routes.size(), date);
             return ResponseEntity.ok(routes);
+        } catch (RuntimeException e) {
+            log.warn("Invalid date format: {}", e.getMessage());
+            return ResponseEntity.badRequest().build();
         } catch (Exception e) {
-            log.error("Error retrieving routes by weight range", e);
+            log.error("Error retrieving routes for date: {}", date, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 
     /**
-     * Get routes by distance range
-     * @param minDistance Minimum total distance
-     * @param maxDistance Maximum total distance
-     * @return List of routes within the distance range
+     * Trigger route optimization
+     * @return Optimization result
      */
-    @GetMapping("/distance-range")
-    public ResponseEntity<List<Route>> getRoutesByDistanceRange(
-            @RequestParam double minDistance,
-            @RequestParam double maxDistance) {
+    @GetMapping("/optimization/trigger")
+    public ResponseEntity<String> triggerRouteOptimization() {
         try {
-            List<Route> routes = routeRepository.findByTotalDistanceBetween(minDistance, maxDistance);
-            log.info("Retrieved {} routes with distance between {} and {}", routes.size(), minDistance, maxDistance);
-            return ResponseEntity.ok(routes);
+            routeService.triggerRouteOptimization();
+            log.info("Route optimization triggered successfully");
+            return ResponseEntity.ok("Route optimization triggered successfully");
         } catch (Exception e) {
-            log.error("Error retrieving routes by distance range", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
-    }
-
-    /**
-     * Get routes that can accommodate additional weight
-     * @param additionalWeight Additional weight to be accommodated
-     * @return List of routes that can carry additional weight
-     */
-    @GetMapping("/can-accommodate-weight")
-    public ResponseEntity<List<Route>> getRoutesWithAvailableCapacity(@RequestParam double additionalWeight) {
-        try {
-            List<Route> routes = routeRepository.findRoutesWithAvailableCapacity(additionalWeight);
-            log.info("Retrieved {} routes that can accommodate weight: {}", routes.size(), additionalWeight);
-            return ResponseEntity.ok(routes);
-        } catch (Exception e) {
-            log.error("Error retrieving routes by available capacity", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
-    }
-
-    /**
-     * Get route count by status
-     * @param status Route status
-     * @return Count of routes with specified status
-     */
-    @GetMapping("/count")
-    public ResponseEntity<Long> getRouteCount(@RequestParam Route.RouteStatus status) {
-        try {
-            long count = routeRepository.countByStatus(status);
-            log.info("Count of routes with status {}: {}", status, count);
-            return ResponseEntity.ok(count);
-        } catch (Exception e) {
-            log.error("Error counting routes by status: {}", status, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
-    }
-
-    /**
-     * Get top routes by weight
-     * @param limit Maximum number of routes to return
-     * @return List of routes ordered by total weight (descending)
-     */
-    @GetMapping("/top-by-weight")
-    public ResponseEntity<List<Route>> getTopRoutesByWeight(@RequestParam(defaultValue = "10") int limit) {
-        try {
-            List<Route> routes = routeRepository.findTopRoutesByWeight(limit);
-            log.info("Retrieved top {} routes by weight", routes.size());
-            return ResponseEntity.ok(routes);
-        } catch (Exception e) {
-            log.error("Error retrieving top routes by weight", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
-    }
-
-    /**
-     * Get top routes by distance
-     * @param limit Maximum number of routes to return
-     * @return List of routes ordered by total distance (descending)
-     */
-    @GetMapping("/top-by-distance")
-    public ResponseEntity<List<Route>> getTopRoutesByDistance(@RequestParam(defaultValue = "10") int limit) {
-        try {
-            List<Route> routes = routeRepository.findTopRoutesByDistance(limit);
-            log.info("Retrieved top {} routes by distance", routes.size());
-            return ResponseEntity.ok(routes);
-        } catch (Exception e) {
-            log.error("Error retrieving top routes by distance", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
-    }
-
-    /**
-     * Get routes that need optimization
-     * @param efficiencyThreshold Efficiency threshold (weight/distance ratio)
-     * @return List of routes that need optimization
-     */
-    @GetMapping("/needing-optimization")
-    public ResponseEntity<List<Route>> getRoutesNeedingOptimization(@RequestParam(defaultValue = "0.5") double efficiencyThreshold) {
-        try {
-            List<Route> routes = routeRepository.findRoutesNeedingOptimization(efficiencyThreshold);
-            log.info("Retrieved {} routes needing optimization (threshold: {})", routes.size(), efficiencyThreshold);
-            return ResponseEntity.ok(routes);
-        } catch (Exception e) {
-            log.error("Error retrieving routes needing optimization", e);
+            log.error("Error triggering route optimization", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
