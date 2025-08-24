@@ -162,6 +162,16 @@ JPA repositories implemented with comprehensive query methods:
 - `RouteRepository` → Route optimization and status queries
 - `TeaCollectionRepository` → System-wide statistics and analytics
 
+### Step 4: REST Controllers ✅
+
+Complete REST API controllers implemented:
+- `SupplierController` → Supplier CRUD and business logic endpoints
+- `TruckController` → Truck management and capacity endpoints
+- `RouteController` → Route operations and optimization endpoints
+- `DepotController` → Depot location and proximity endpoints
+- `AnalyticsController` → System statistics and reporting endpoints
+- `OptimizationController` → Route optimization and OptaPlanner integration endpoints
+
 **Next**: Model Planning Entities and Variables for OptaPlanner.
 
 ### Step 4: Distance/Travel Time Calculation
