@@ -1,266 +1,145 @@
 package com.teacollection.teacollection_backend.controller;
 
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
+import com.teacollection.teacollection_backend.*;
+import com.teacollection.teacollection_backend.service.OptimizationService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
-import java.util.HashMap;
 
-/**
- * REST Controller for route optimization operations.
- * Handles OptaPlanner integration and route optimization requests.
- */
 @RestController
 @RequestMapping("/api/optimization")
-@RequiredArgsConstructor
-@Slf4j
 @CrossOrigin(origins = "*")
 public class OptimizationController {
 
-    // TODO: Inject OptaPlanner solver service when implemented
-    // private final SolverService solverService;
+    @Autowired
+    private OptimizationService optimizationService;
 
-    /**
-     * Trigger route optimization for all ready suppliers
-     * @return Optimization result summary
-     */
-    @PostMapping("/optimize-routes")
-    public ResponseEntity<Map<String, Object>> optimizeRoutes() {
-        try {
-            log.info("Route optimization requested");
-            
-            // TODO: Implement actual optimization logic
-            // List<Route> optimizedRoutes = solverService.optimizeRoutes();
-            
-            Map<String, Object> result = new HashMap<>();
-            result.put("message", "Route optimization completed");
-            result.put("status", "SUCCESS");
-            result.put("routesOptimized", 0); // TODO: Replace with actual count
-            result.put("timestamp", java.time.LocalDateTime.now());
-            
-            log.info("Route optimization completed successfully");
-            return ResponseEntity.ok(result);
-        } catch (Exception e) {
-            log.error("Error during route optimization", e);
-            
-            Map<String, Object> errorResult = new HashMap<>();
-            errorResult.put("message", "Route optimization failed");
-            errorResult.put("status", "ERROR");
-            errorResult.put("error", e.getMessage());
-            errorResult.put("timestamp", java.time.LocalDateTime.now());
-            
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResult);
-        }
+    @PostMapping("/optimize")
+    public ResponseEntity<TeaLeafSolution> optimizeRoutes() {
+        // Create test data for demonstration
+        List<Truck> trucks = createTestTrucks();
+        List<Supplier> suppliers = createTestSuppliers();
+        Depot depot = createTestDepot();
+
+        // Run optimization
+        TeaLeafSolution solution = optimizationService.optimizeTeaCollection(trucks, suppliers, depot);
+        
+        return ResponseEntity.ok(solution);
     }
 
-    /**
-     * Optimize routes for specific suppliers
-     * @param supplierIds List of supplier IDs to optimize
-     * @return Optimization result summary
-     */
-    @PostMapping("/optimize-specific-suppliers")
-    public ResponseEntity<Map<String, Object>> optimizeRoutesForSuppliers(@RequestBody Long[] supplierIds) {
-        try {
-            log.info("Route optimization requested for {} suppliers", supplierIds.length);
-            
-            // TODO: Implement specific supplier optimization
-            // List<Route> optimizedRoutes = solverService.optimizeRoutesForSuppliers(Arrays.asList(supplierIds));
-            
-            Map<String, Object> result = new HashMap<>();
-            result.put("message", "Specific supplier route optimization completed");
-            result.put("status", "SUCCESS");
-            result.put("suppliersProcessed", supplierIds.length);
-            result.put("routesOptimized", 0); // TODO: Replace with actual count
-            result.put("timestamp", java.time.LocalDateTime.now());
-            
-            log.info("Specific supplier route optimization completed successfully");
-            return ResponseEntity.ok(result);
-        } catch (Exception e) {
-            log.error("Error during specific supplier route optimization", e);
-            
-            Map<String, Object> errorResult = new HashMap<>();
-            errorResult.put("message", "Specific supplier route optimization failed");
-            errorResult.put("status", "ERROR");
-            errorResult.put("error", e.getMessage());
-            errorResult.put("timestamp", java.time.LocalDateTime.now());
-            
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResult);
-        }
+    @PostMapping("/optimize-custom")
+    public ResponseEntity<TeaLeafSolution> optimizeCustomRoutes(@RequestBody OptimizationRequest request) {
+        // Convert request to domain objects
+        List<Truck> trucks = request.getTrucks();
+        List<Supplier> suppliers = request.getSuppliers();
+        Depot depot = request.getDepot();
+
+        // Run optimization
+        TeaLeafSolution solution = optimizationService.optimizeTeaCollection(trucks, suppliers, depot);
+        
+        return ResponseEntity.ok(solution);
     }
 
-    /**
-     * Get optimization status and progress
-     * @return Current optimization status
-     */
-    @GetMapping("/status")
-    public ResponseEntity<Map<String, Object>> getOptimizationStatus() {
-        try {
-            log.info("Optimization status requested");
-            
-            // TODO: Implement actual status checking
-            // OptimizationStatus status = solverService.getOptimizationStatus();
-            
-            Map<String, Object> status = new HashMap<>();
-            status.put("status", "IDLE"); // TODO: Replace with actual status
-            status.put("progress", 0.0); // TODO: Replace with actual progress
-            status.put("currentOperation", "None"); // TODO: Replace with actual operation
-            status.put("lastOptimization", null); // TODO: Replace with actual timestamp
-            status.put("timestamp", java.time.LocalDateTime.now());
-            
-            return ResponseEntity.ok(status);
-        } catch (Exception e) {
-            log.error("Error retrieving optimization status", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+    @GetMapping("/test-data")
+    public ResponseEntity<Map<String, Object>> getTestData() {
+        List<Truck> trucks = createTestTrucks();
+        List<Supplier> suppliers = createTestSuppliers();
+        Depot depot = createTestDepot();
+
+        return ResponseEntity.ok(Map.of(
+            "trucks", trucks,
+            "suppliers", suppliers,
+            "depot", depot
+        ));
     }
 
-    /**
-     * Cancel ongoing optimization
-     * @return Cancellation result
-     */
-    @PostMapping("/cancel")
-    public ResponseEntity<Map<String, Object>> cancelOptimization() {
-        try {
-            log.info("Optimization cancellation requested");
-            
-            // TODO: Implement actual cancellation logic
-            // boolean cancelled = solverService.cancelOptimization();
-            
-            Map<String, Object> result = new HashMap<>();
-            result.put("message", "Optimization cancelled successfully");
-            result.put("status", "CANCELLED");
-            result.put("timestamp", java.time.LocalDateTime.now());
-            
-            log.info("Optimization cancelled successfully");
-            return ResponseEntity.ok(result);
-        } catch (Exception e) {
-            log.error("Error cancelling optimization", e);
-            
-            Map<String, Object> errorResult = new HashMap<>();
-            errorResult.put("message", "Failed to cancel optimization");
-            errorResult.put("status", "ERROR");
-            errorResult.put("error", e.getMessage());
-            errorResult.put("timestamp", java.time.LocalDateTime.now());
-            
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResult);
-        }
+    private List<Truck> createTestTrucks() {
+        Truck truck1 = new Truck();
+        truck1.setId(1L);
+        truck1.setMaxCapacity(2000.0);
+        truck1.setCurrentLoad(0.0);
+        truck1.setStatus("IDLE");
+
+        Truck truck2 = new Truck();
+        truck2.setId(2L);
+        truck2.setMaxCapacity(1500.0);
+        truck2.setCurrentLoad(0.0);
+        truck2.setStatus("IDLE");
+
+        Truck truck3 = new Truck();
+        truck3.setId(3L);
+        truck3.setMaxCapacity(1000.0);
+        truck3.setCurrentLoad(0.0);
+        truck3.setStatus("IDLE");
+
+        return Arrays.asList(truck1, truck2, truck3);
     }
 
-    /**
-     * Get optimization configuration
-     * @return Current optimization settings
-     */
-    @GetMapping("/config")
-    public ResponseEntity<Map<String, Object>> getOptimizationConfig() {
-        try {
-            log.info("Optimization configuration requested");
-            
-            // TODO: Implement actual configuration retrieval
-            Map<String, Object> config = new HashMap<>();
-            config.put("solverTimeout", 300); // 5 minutes in seconds
-            config.put("maxIterations", 1000);
-            config.put("constraintWeight", 1.0);
-            config.put("distanceWeight", 0.8);
-            config.put("capacityWeight", 0.9);
-            config.put("timestamp", java.time.LocalDateTime.now());
-            
-            return ResponseEntity.ok(config);
-        } catch (Exception e) {
-            log.error("Error retrieving optimization configuration", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+    private List<Supplier> createTestSuppliers() {
+        Supplier supplier1 = new Supplier();
+        supplier1.setId(1L);
+        supplier1.setLatitude(1.0);
+        supplier1.setLongitude(1.0);
+        supplier1.setHarvestWeight(800.0);
+        supplier1.setReady(true);
+
+        Supplier supplier2 = new Supplier();
+        supplier2.setId(2L);
+        supplier2.setLatitude(2.0);
+        supplier2.setLongitude(1.0);
+        supplier2.setHarvestWeight(600.0);
+        supplier2.setReady(true);
+
+        Supplier supplier3 = new Supplier();
+        supplier3.setId(3L);
+        supplier3.setLatitude(1.0);
+        supplier3.setLongitude(2.0);
+        supplier3.setHarvestWeight(400.0);
+        supplier3.setReady(true);
+
+        Supplier supplier4 = new Supplier();
+        supplier4.setId(4L);
+        supplier4.setLatitude(3.0);
+        supplier4.setLongitude(2.0);
+        supplier4.setHarvestWeight(1200.0);
+        supplier4.setReady(true);
+
+        Supplier supplier5 = new Supplier();
+        supplier5.setId(5L);
+        supplier5.setLatitude(2.0);
+        supplier5.setLongitude(3.0);
+        supplier5.setHarvestWeight(900.0);
+        supplier5.setReady(true);
+
+        return Arrays.asList(supplier1, supplier2, supplier3, supplier4, supplier5);
     }
 
-    /**
-     * Update optimization configuration
-     * @param config New optimization settings
-     * @return Updated configuration
-     */
-    @PutMapping("/config")
-    public ResponseEntity<Map<String, Object>> updateOptimizationConfig(@RequestBody Map<String, Object> config) {
-        try {
-            log.info("Optimization configuration update requested");
-            
-            // TODO: Implement actual configuration update
-            // boolean updated = solverService.updateConfiguration(config);
-            
-            config.put("message", "Configuration updated successfully");
-            config.put("status", "UPDATED");
-            config.put("timestamp", java.time.LocalDateTime.now());
-            
-            log.info("Optimization configuration updated successfully");
-            return ResponseEntity.ok(config);
-        } catch (Exception e) {
-            log.error("Error updating optimization configuration", e);
-            
-            Map<String, Object> errorResult = new HashMap<>();
-            errorResult.put("message", "Failed to update configuration");
-            errorResult.put("status", "ERROR");
-            errorResult.put("error", e.getMessage());
-            errorResult.put("timestamp", java.time.LocalDateTime.now());
-            
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResult);
-        }
+    private Depot createTestDepot() {
+        Depot depot = new Depot();
+        depot.setId(1L);
+        depot.setLatitude(0.0);
+        depot.setLongitude(0.0);
+        return depot;
     }
 
-    /**
-     * Get optimization history
-     * @return List of recent optimization runs
-     */
-    @GetMapping("/history")
-    public ResponseEntity<Map<String, Object>> getOptimizationHistory() {
-        try {
-            log.info("Optimization history requested");
-            
-            // TODO: Implement actual history retrieval
-            Map<String, Object> history = new HashMap<>();
-            history.put("totalRuns", 0); // TODO: Replace with actual count
-            history.put("successfulRuns", 0); // TODO: Replace with actual count
-            history.put("failedRuns", 0); // TODO: Replace with actual count
-            history.put("averageOptimizationTime", 0.0); // TODO: Replace with actual time
-            history.put("lastRun", null); // TODO: Replace with actual timestamp
-            history.put("timestamp", java.time.LocalDateTime.now());
-            
-            return ResponseEntity.ok(history);
-        } catch (Exception e) {
-            log.error("Error retrieving optimization history", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
-    }
+    // Request DTO for custom optimization
+    public static class OptimizationRequest {
+        private List<Truck> trucks;
+        private List<Supplier> suppliers;
+        private Depot depot;
 
-    /**
-     * Validate optimization constraints
-     * @return Constraint validation result
-     */
-    @PostMapping("/validate-constraints")
-    public ResponseEntity<Map<String, Object>> validateConstraints() {
-        try {
-            log.info("Constraint validation requested");
-            
-            // TODO: Implement actual constraint validation
-            // ConstraintValidationResult result = solverService.validateConstraints();
-            
-            Map<String, Object> validation = new HashMap<>();
-            validation.put("status", "VALID"); // TODO: Replace with actual validation status
-            validation.put("constraintsValidated", 0); // TODO: Replace with actual count
-            validation.put("violations", 0); // TODO: Replace with actual count
-            validation.put("timestamp", java.time.LocalDateTime.now());
-            
-            log.info("Constraint validation completed successfully");
-            return ResponseEntity.ok(validation);
-        } catch (Exception e) {
-            log.error("Error during constraint validation", e);
-            
-            Map<String, Object> errorResult = new HashMap<>();
-            errorResult.put("message", "Constraint validation failed");
-            errorResult.put("status", "ERROR");
-            errorResult.put("error", e.getMessage());
-            errorResult.put("timestamp", java.time.LocalDateTime.now());
-            
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResult);
-        }
+        // Getters and setters
+        public List<Truck> getTrucks() { return trucks; }
+        public void setTrucks(List<Truck> trucks) { this.trucks = trucks; }
+        
+        public List<Supplier> getSuppliers() { return suppliers; }
+        public void setSuppliers(List<Supplier> suppliers) { this.suppliers = suppliers; }
+        
+        public Depot getDepot() { return depot; }
+        public void setDepot(Depot depot) { this.depot = depot; }
     }
 }
