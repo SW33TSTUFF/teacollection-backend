@@ -27,7 +27,7 @@ public class TeaCollectionConstraintProvider implements ConstraintProvider {
         return constraintFactory
                 .forEach(SupplierAssignment.class)
                 .filter(SupplierAssignment::isAssigned)
-                .groupBy(SupplierAssignment::getAssignedTruck, 
+                .groupBy(SupplierAssignment::getTruck, 
                          ConstraintCollectors.sum(assignment -> (int) assignment.getHarvestWeight()))
                 .filter((truck, totalWeight) -> totalWeight > truck.getMaxCapacity())
                 .penalize(HardSoftScore.ONE_HARD, 
@@ -44,17 +44,14 @@ public class TeaCollectionConstraintProvider implements ConstraintProvider {
                 .asConstraint("Unassigned supplier");
     }
 
-    // Soft constraint: Minimize total distance traveled between consecutive suppliers
+    // Soft constraint: Minimize total distance traveled between consecutive stops
     private Constraint minimizeTotalDistanceConstraint(ConstraintFactory constraintFactory) {
         return constraintFactory
                 .forEach(SupplierAssignment.class)
-                .filter(assignment -> assignment.isAssigned() && 
-                                    assignment.getPreviousAssignment() != null &&
-                                    assignment.getPreviousAssignment().isAssigned())
+                .filter(assignment -> assignment.isAssigned())
                 .penalize(HardSoftScore.ONE_SOFT, 
-                          assignment -> calculateDistanceBetweenSuppliers(
-                              assignment.getPreviousAssignment(), assignment))
-                .asConstraint("Distance between consecutive suppliers");
+                          assignment -> (int)(assignment.getDistanceFromPrevious() * 1000)) // Convert km to meters
+                .asConstraint("Distance between consecutive stops");
     }
 
     // Soft constraint: Minimize number of trucks used
@@ -62,25 +59,8 @@ public class TeaCollectionConstraintProvider implements ConstraintProvider {
         return constraintFactory
                 .forEach(Truck.class)
                 .ifNotExists(SupplierAssignment.class, 
-                            Joiners.equal(truck -> truck, SupplierAssignment::getAssignedTruck),
-                            Joiners.filtering((truck, assignment) -> assignment.isAssigned()))
+                            Joiners.equal(truck -> truck, SupplierAssignment::getTruck))
                 .reward(HardSoftScore.ONE_SOFT, truck -> 100)
                 .asConstraint("Reward unused trucks");
-    }
-
-    // Helper method to calculate distance between two suppliers
-    private int calculateDistanceBetweenSuppliers(SupplierAssignment supplier1, SupplierAssignment supplier2) {
-        if (supplier1 == null || supplier2 == null) {
-            return 0;
-        }
-        
-        double lat1 = supplier1.getLatitude();
-        double lon1 = supplier1.getLongitude();
-        double lat2 = supplier2.getLatitude();
-        double lon2 = supplier2.getLongitude();
-        
-        double deltaLat = lat2 - lat1;
-        double deltaLon = lon2 - lon1;
-        return (int) (Math.sqrt(deltaLat * deltaLat + deltaLon * deltaLon) * 100);
     }
 }
